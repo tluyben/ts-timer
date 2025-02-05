@@ -118,9 +118,8 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
         return result;
       }
 
-      // Handle function declarations by wrapping their body with timing code
+      // Handle function declarations
       if (ts.isFunctionDeclaration(node)) {
-        const timerSuffix = "";
         const originalNode = ts.visitEachChild(
           node,
           (child) => visit(child, sf),
@@ -128,87 +127,6 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
         ) as ts.FunctionDeclaration;
 
         if (!originalNode.body) return originalNode;
-
-        const newBody = factory.createBlock([
-          factory.createExpressionStatement(
-            factory.createBinaryExpression(
-              factory.createIdentifier(`_____sftimer${timerSuffix}`),
-              factory.createToken(ts.SyntaxKind.EqualsToken),
-              factory.createNewExpression(
-                factory.createIdentifier("Date"),
-                [],
-                []
-              )
-            )
-          ),
-          ...originalNode.body.statements,
-          factory.createExpressionStatement(
-            factory.createBinaryExpression(
-              factory.createIdentifier(`_____eftimer${timerSuffix}`),
-              factory.createToken(ts.SyntaxKind.EqualsToken),
-              factory.createNewExpression(
-                factory.createIdentifier("Date"),
-                [],
-                []
-              )
-            )
-          ),
-          factory.createExpressionStatement(
-            factory.createCallExpression(
-              factory.createPropertyAccessExpression(
-                factory.createIdentifier("_____ptimers"),
-                factory.createIdentifier("push")
-              ),
-              [],
-              [
-                factory.createObjectLiteralExpression(
-                  [
-                    factory.createPropertyAssignment(
-                      "line",
-                      factory.createNumericLiteral(
-                        sf.getLineAndCharacterOfPosition(node.pos).line + 1
-                      )
-                    ),
-                    factory.createPropertyAssignment(
-                      "code",
-                      factory.createStringLiteral(node.getText(sf))
-                    ),
-                    factory.createPropertyAssignment(
-                      "start",
-                      factory.createIdentifier(`_____sftimer${timerSuffix}`)
-                    ),
-                    factory.createPropertyAssignment(
-                      "end",
-                      factory.createIdentifier(`_____eftimer${timerSuffix}`)
-                    ),
-                    factory.createPropertyAssignment(
-                      "diff",
-                      factory.createCallExpression(
-                        factory.createPropertyAccessExpression(
-                          factory.createParenthesizedExpression(
-                            factory.createBinaryExpression(
-                              factory.createIdentifier(
-                                `_____eftimer${timerSuffix}`
-                              ),
-                              factory.createToken(ts.SyntaxKind.MinusToken),
-                              factory.createIdentifier(
-                                `_____sftimer${timerSuffix}`
-                              )
-                            )
-                          ),
-                          factory.createIdentifier("valueOf")
-                        ),
-                        [],
-                        []
-                      )
-                    ),
-                  ],
-                  true
-                ),
-              ]
-            )
-          ),
-        ]);
 
         return factory.updateFunctionDeclaration(
           originalNode,
@@ -218,7 +136,7 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
           originalNode.typeParameters,
           originalNode.parameters,
           originalNode.type,
-          newBody
+          originalNode.body
         );
       }
 
