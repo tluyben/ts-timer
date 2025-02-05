@@ -48,10 +48,7 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
             ),
             factory.createExpressionStatement(
               factory.createCallExpression(
-                factory.createPropertyAccessExpression(
-                  factory.createIdentifier("_____ptimers"),
-                  factory.createIdentifier("push")
-                ),
+                factory.createIdentifier("_____timerPush"),
                 [],
                 [
                   factory.createObjectLiteralExpression(
@@ -166,6 +163,70 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
         return max;
       })(sourceFile);
 
+      // Create _____timerPush function
+      const timerPushFunction = factory.createFunctionDeclaration(
+        undefined,
+        undefined,
+        factory.createIdentifier("_____timerPush"),
+        undefined,
+        [
+          factory.createParameterDeclaration(
+            [],
+            undefined,
+            factory.createIdentifier("params"),
+            undefined,
+            factory.createTypeLiteralNode([
+              factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("line"),
+                undefined,
+                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
+              ),
+              factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("code"),
+                undefined,
+                factory.createKeywordTypeNode(ts.SyntaxKind.StringKeyword)
+              ),
+              factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("start"),
+                undefined,
+                factory.createTypeReferenceNode("Date", undefined)
+              ),
+              factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("end"),
+                undefined,
+                factory.createTypeReferenceNode("Date", undefined)
+              ),
+              factory.createPropertySignature(
+                undefined,
+                factory.createIdentifier("diff"),
+                undefined,
+                factory.createKeywordTypeNode(ts.SyntaxKind.NumberKeyword)
+              ),
+            ])
+          ),
+        ],
+        undefined,
+        factory.createBlock(
+          [
+            factory.createExpressionStatement(
+              factory.createCallExpression(
+                factory.createPropertyAccessExpression(
+                  factory.createIdentifier("_____ptimers"),
+                  factory.createIdentifier("push")
+                ),
+                undefined,
+                [factory.createIdentifier("params")]
+              )
+            ),
+          ],
+          true
+        )
+      );
+
       // Create preamble
       const preamble: ts.Statement[] = [
         // Timer array
@@ -183,6 +244,8 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
             ts.NodeFlags.Const
           )
         ),
+        // Add _____timerPush function
+        timerPushFunction,
       ];
 
       // Create timer variables for each depth
@@ -324,10 +387,7 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
           ),
           factory.createExpressionStatement(
             factory.createCallExpression(
-              factory.createPropertyAccessExpression(
-                factory.createIdentifier("_____ptimers"),
-                factory.createIdentifier("push")
-              ),
+              factory.createIdentifier("_____timerPush"),
               [],
               [
                 factory.createObjectLiteralExpression(
