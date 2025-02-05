@@ -5,12 +5,6 @@ let _____sftimer_1: any;
 let _____eftimer_1: any;
 let _____sftimer_2: any;
 let _____eftimer_2: any;
-let _____sftimer_3: any;
-let _____eftimer_3: any;
-let _____sftimer_4: any;
-let _____eftimer_4: any;
-let _____sftimer_5: any;
-let _____eftimer_5: any;
 process.on("exit", () => { console.log("Performance Measurements:"); console.log(JSON.stringify(_____ptimers, null, 2)); });
 _____sftimer = new Date();
 function fibonacci(n: any): any {

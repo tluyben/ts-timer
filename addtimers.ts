@@ -1,5 +1,64 @@
 import * as ts from "typescript";
 
+function analyzeNestingDepth(node: ts.Node): number {
+  let maxDepth = 0;
+  let currentDepth = 0;
+
+  function visit(node: ts.Node) {
+    if (ts.isBlock(node)) {
+      currentDepth++;
+      maxDepth = Math.max(maxDepth, currentDepth);
+      ts.forEachChild(node, visit);
+      currentDepth--;
+    } else {
+      ts.forEachChild(node, visit);
+    }
+  }
+
+  visit(node);
+  return maxDepth;
+}
+
+function createTimerDeclarations(maxDepth: number): ts.Statement[] {
+  const factory = ts.factory;
+  const declarations: ts.Statement[] = [];
+
+  for (let depth = 0; depth <= maxDepth; depth++) {
+    const suffix = depth === 0 ? "" : `_${depth}`;
+    declarations.push(
+      factory.createVariableStatement(
+        undefined,
+        factory.createVariableDeclarationList(
+          [
+            factory.createVariableDeclaration(
+              factory.createIdentifier(`_____sftimer${suffix}`),
+              undefined,
+              undefined,
+              undefined
+            ),
+          ],
+          ts.NodeFlags.Let
+        )
+      ),
+      factory.createVariableStatement(
+        undefined,
+        factory.createVariableDeclarationList(
+          [
+            factory.createVariableDeclaration(
+              factory.createIdentifier(`_____eftimer${suffix}`),
+              undefined,
+              undefined,
+              undefined
+            ),
+          ],
+          ts.NodeFlags.Let
+        )
+      )
+    );
+  }
+  return declarations;
+}
+
 function createTimingWrapper(
   node: ts.Statement,
   sourceFile: ts.SourceFile,
@@ -9,7 +68,6 @@ function createTimingWrapper(
   const timerSuffix = depth > 0 ? `_${depth}` : "";
 
   return [
-    // Start timer
     factory.createExpressionStatement(
       factory.createBinaryExpression(
         factory.createIdentifier(`_____sftimer${timerSuffix}`),
@@ -17,9 +75,7 @@ function createTimingWrapper(
         factory.createNewExpression(factory.createIdentifier("Date"), [], [])
       )
     ),
-    // Original statement
     node,
-    // End timer
     factory.createExpressionStatement(
       factory.createBinaryExpression(
         factory.createIdentifier(`_____eftimer${timerSuffix}`),
@@ -27,7 +83,6 @@ function createTimingWrapper(
         factory.createNewExpression(factory.createIdentifier("Date"), [], [])
       )
     ),
-    // Push measurement
     factory.createExpressionStatement(
       factory.createCallExpression(
         factory.createPropertyAccessExpression(
@@ -87,11 +142,13 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
     const factory = ts.factory;
 
     return (sourceFile: ts.SourceFile) => {
-      let depth = 0;
+      // First pass: analyze nesting depth
+      const maxDepth = analyzeNestingDepth(sourceFile);
+      let currentDepth = 0;
 
       function visit(node: ts.Node): ts.Node {
         if (ts.isBlock(node)) {
-          depth++;
+          currentDepth++;
           const statements = (node as ts.Block).statements.flatMap((stmt) => {
             if (
               ts.isImportDeclaration(stmt) ||
@@ -103,9 +160,13 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
             ) {
               return [stmt];
             }
-            return createTimingWrapper(stmt as ts.Statement, sourceFile, depth);
+            return createTimingWrapper(
+              stmt as ts.Statement,
+              sourceFile,
+              currentDepth
+            );
           });
-          depth--;
+          currentDepth--;
           return factory.createBlock(statements, true);
         }
 
@@ -117,9 +178,7 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
         visit
       ) as ts.SourceFile;
 
-      // Create preamble statements
       const preamble = [
-        // Timer array
         factory.createVariableStatement(
           undefined,
           factory.createVariableDeclarationList(
@@ -134,38 +193,7 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
             ts.NodeFlags.Const
           )
         ),
-        // Create separate declarations for each timer variable
-        ...["", "_1", "_2", "_3", "_4", "_5"].flatMap((suffix) => [
-          factory.createVariableStatement(
-            undefined,
-            factory.createVariableDeclarationList(
-              [
-                factory.createVariableDeclaration(
-                  factory.createIdentifier(`_____sftimer${suffix}`),
-                  undefined,
-                  undefined,
-                  undefined
-                ),
-              ],
-              ts.NodeFlags.Let
-            )
-          ),
-          factory.createVariableStatement(
-            undefined,
-            factory.createVariableDeclarationList(
-              [
-                factory.createVariableDeclaration(
-                  factory.createIdentifier(`_____eftimer${suffix}`),
-                  undefined,
-                  undefined,
-                  undefined
-                ),
-              ],
-              ts.NodeFlags.Let
-            )
-          ),
-        ]),
-        // Exit handler
+        ...createTimerDeclarations(maxDepth),
         factory.createExpressionStatement(
           factory.createCallExpression(
             factory.createPropertyAccessExpression(
@@ -222,7 +250,6 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
         ),
       ];
 
-      // Transform top-level statements
       const statements = transformedSourceFile.statements.flatMap((stmt) => {
         if (
           ts.isImportDeclaration(stmt) ||
@@ -262,21 +289,3 @@ export function addTimers(sourceCode: string): string {
 
   return printer.printFile(result.transformed[0]);
 }
-
-// // Test code
-// const sourceCode = `
-// function fibonacci(n) {
-//     let n1 = 0, n2 = 1, nextTerm;
-//     console.log('Fibonacci Series:');
-//     for (let i = 1; i <= n; i++) {
-//         console.log(n1);
-//         nextTerm = n1 + n2;
-//         n1 = n2;
-//         n2 = nextTerm;
-//     }
-// }
-
-// fibonacci(10);
-// `;
-
-// console.log(addTimers(sourceCode));
