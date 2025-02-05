@@ -1,184 +1,152 @@
 import * as ts from "typescript";
 
-function analyzeNestingDepth(node: ts.Node): number {
-  let maxDepth = 0;
-  let currentDepth = 0;
-
-  function visit(node: ts.Node) {
-    if (ts.isBlock(node)) {
-      currentDepth++;
-      maxDepth = Math.max(maxDepth, currentDepth);
-      ts.forEachChild(node, visit);
-      currentDepth--;
-    } else {
-      ts.forEachChild(node, visit);
-    }
-  }
-
-  visit(node);
-  return maxDepth;
-}
-
-function createTimerDeclarations(maxDepth: number): ts.Statement[] {
-  const factory = ts.factory;
-  const declarations: ts.Statement[] = [];
-
-  for (let depth = 0; depth <= maxDepth; depth++) {
-    const suffix = depth === 0 ? "" : `_${depth}`;
-    declarations.push(
-      factory.createVariableStatement(
-        undefined,
-        factory.createVariableDeclarationList(
-          [
-            factory.createVariableDeclaration(
-              factory.createIdentifier(`_____sftimer${suffix}`),
-              undefined,
-              undefined,
-              undefined
-            ),
-          ],
-          ts.NodeFlags.Let
-        )
-      ),
-      factory.createVariableStatement(
-        undefined,
-        factory.createVariableDeclarationList(
-          [
-            factory.createVariableDeclaration(
-              factory.createIdentifier(`_____eftimer${suffix}`),
-              undefined,
-              undefined,
-              undefined
-            ),
-          ],
-          ts.NodeFlags.Let
-        )
-      )
-    );
-  }
-  return declarations;
-}
-
-function createTimingWrapper(
-  node: ts.Statement,
-  sourceFile: ts.SourceFile,
-  depth: number = 0
-): ts.Statement[] {
-  const factory = ts.factory;
-  const timerSuffix = depth > 0 ? `_${depth}` : "";
-
-  return [
-    factory.createExpressionStatement(
-      factory.createBinaryExpression(
-        factory.createIdentifier(`_____sftimer${timerSuffix}`),
-        factory.createToken(ts.SyntaxKind.EqualsToken),
-        factory.createNewExpression(factory.createIdentifier("Date"), [], [])
-      )
-    ),
-    node,
-    factory.createExpressionStatement(
-      factory.createBinaryExpression(
-        factory.createIdentifier(`_____eftimer${timerSuffix}`),
-        factory.createToken(ts.SyntaxKind.EqualsToken),
-        factory.createNewExpression(factory.createIdentifier("Date"), [], [])
-      )
-    ),
-    factory.createExpressionStatement(
-      factory.createCallExpression(
-        factory.createPropertyAccessExpression(
-          factory.createIdentifier("_____ptimers"),
-          factory.createIdentifier("push")
-        ),
-        [],
-        [
-          factory.createObjectLiteralExpression(
-            [
-              factory.createPropertyAssignment(
-                "line",
-                factory.createNumericLiteral(
-                  sourceFile.getLineAndCharacterOfPosition(node.pos).line + 1
-                )
-              ),
-              factory.createPropertyAssignment(
-                "code",
-                factory.createStringLiteral(node.getText(sourceFile))
-              ),
-              factory.createPropertyAssignment(
-                "start",
-                factory.createIdentifier(`_____sftimer${timerSuffix}`)
-              ),
-              factory.createPropertyAssignment(
-                "end",
-                factory.createIdentifier(`_____eftimer${timerSuffix}`)
-              ),
-              factory.createPropertyAssignment(
-                "diff",
-                factory.createCallExpression(
-                  factory.createPropertyAccessExpression(
-                    factory.createParenthesizedExpression(
-                      factory.createBinaryExpression(
-                        factory.createIdentifier(`_____eftimer${timerSuffix}`),
-                        factory.createToken(ts.SyntaxKind.MinusToken),
-                        factory.createIdentifier(`_____sftimer${timerSuffix}`)
-                      )
-                    ),
-                    factory.createIdentifier("valueOf")
-                  ),
-                  [],
-                  []
-                )
-              ),
-            ],
-            true
-          ),
-        ]
-      )
-    ),
-  ];
-}
-
 function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
   return (context: ts.TransformationContext) => {
     const factory = ts.factory;
+    let depth = 0;
 
-    return (sourceFile: ts.SourceFile) => {
-      // First pass: analyze nesting depth
-      const maxDepth = analyzeNestingDepth(sourceFile);
-      let currentDepth = 0;
+    function visit(node: ts.Node, sf: ts.SourceFile): ts.Node {
+      // Handle blocks and control flow statements
+      if (ts.isBlock(node)) {
+        depth++;
+        const statements = (node as ts.Block).statements.flatMap((stmt) => {
+          if (
+            ts.isImportDeclaration(stmt) ||
+            ts.isExportDeclaration(stmt) ||
+            (ts.isVariableStatement(stmt) &&
+              stmt.declarationList.declarations.some((d) =>
+                d.name.getText(sf).startsWith("_____")
+              ))
+          ) {
+            return [stmt];
+          }
 
-      function visit(node: ts.Node): ts.Node {
-        if (ts.isBlock(node)) {
-          currentDepth++;
-          const statements = (node as ts.Block).statements.flatMap((stmt) => {
-            if (
-              ts.isImportDeclaration(stmt) ||
-              ts.isExportDeclaration(stmt) ||
-              (ts.isVariableStatement(stmt) &&
-                stmt.declarationList.declarations.some((d) =>
-                  d.name.getText(sourceFile).startsWith("_____")
-                ))
-            ) {
-              return [stmt];
-            }
-            return createTimingWrapper(
-              stmt as ts.Statement,
-              sourceFile,
-              currentDepth
-            );
-          });
-          currentDepth--;
-          return factory.createBlock(statements, true);
-        }
-
-        return ts.visitEachChild(node, visit, context);
+          const timerSuffix = depth > 0 ? `_${depth}` : "";
+          return [
+            factory.createExpressionStatement(
+              factory.createBinaryExpression(
+                factory.createIdentifier(`_____sftimer${timerSuffix}`),
+                factory.createToken(ts.SyntaxKind.EqualsToken),
+                factory.createNewExpression(
+                  factory.createIdentifier("Date"),
+                  [],
+                  []
+                )
+              )
+            ),
+            ts.visitEachChild(stmt, (child) => visit(child, sf), context),
+            factory.createExpressionStatement(
+              factory.createBinaryExpression(
+                factory.createIdentifier(`_____eftimer${timerSuffix}`),
+                factory.createToken(ts.SyntaxKind.EqualsToken),
+                factory.createNewExpression(
+                  factory.createIdentifier("Date"),
+                  [],
+                  []
+                )
+              )
+            ),
+            factory.createExpressionStatement(
+              factory.createCallExpression(
+                factory.createPropertyAccessExpression(
+                  factory.createIdentifier("_____ptimers"),
+                  factory.createIdentifier("push")
+                ),
+                [],
+                [
+                  factory.createObjectLiteralExpression(
+                    [
+                      factory.createPropertyAssignment(
+                        "line",
+                        factory.createNumericLiteral(
+                          sf.getLineAndCharacterOfPosition(stmt.pos).line + 1
+                        )
+                      ),
+                      factory.createPropertyAssignment(
+                        "code",
+                        factory.createStringLiteral(stmt.getText(sf))
+                      ),
+                      factory.createPropertyAssignment(
+                        "start",
+                        factory.createIdentifier(`_____sftimer${timerSuffix}`)
+                      ),
+                      factory.createPropertyAssignment(
+                        "end",
+                        factory.createIdentifier(`_____eftimer${timerSuffix}`)
+                      ),
+                      factory.createPropertyAssignment(
+                        "diff",
+                        factory.createCallExpression(
+                          factory.createPropertyAccessExpression(
+                            factory.createParenthesizedExpression(
+                              factory.createBinaryExpression(
+                                factory.createIdentifier(
+                                  `_____eftimer${timerSuffix}`
+                                ),
+                                factory.createToken(ts.SyntaxKind.MinusToken),
+                                factory.createIdentifier(
+                                  `_____sftimer${timerSuffix}`
+                                )
+                              )
+                            ),
+                            factory.createIdentifier("valueOf")
+                          ),
+                          [],
+                          []
+                        )
+                      ),
+                    ],
+                    true
+                  ),
+                ]
+              )
+            ),
+          ];
+        });
+        depth--;
+        return factory.createBlock(statements, true);
       }
 
-      const transformedSourceFile = ts.visitNode(
-        sourceFile,
-        visit
-      ) as ts.SourceFile;
+      if (ts.isForStatement(node) || ts.isIfStatement(node)) {
+        depth++;
+        const result = ts.visitEachChild(
+          node,
+          (child) => visit(child, sf),
+          context
+        );
+        depth--;
+        return result;
+      }
 
-      const preamble = [
+      return ts.visitEachChild(node, (child) => visit(child, sf), context);
+    }
+
+    return (sourceFile: ts.SourceFile) => {
+      // Analyze max depth
+      const maxDepth = ((node: ts.Node) => {
+        let max = 0;
+        let current = 0;
+        const visit = (node: ts.Node) => {
+          if (
+            ts.isBlock(node) ||
+            ts.isForStatement(node) ||
+            ts.isIfStatement(node)
+          ) {
+            current++;
+            max = Math.max(max, current);
+            ts.forEachChild(node, visit);
+            current--;
+          } else {
+            ts.forEachChild(node, visit);
+          }
+        };
+        visit(node);
+        return max;
+      })(sourceFile);
+
+      // Create preamble
+      const preamble: ts.Statement[] = [
+        // Timer array
         factory.createVariableStatement(
           undefined,
           factory.createVariableDeclarationList(
@@ -193,7 +161,91 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
             ts.NodeFlags.Const
           )
         ),
-        ...createTimerDeclarations(maxDepth),
+      ];
+
+      // Create timer variables for each depth
+      for (let i = 0; i <= maxDepth; i++) {
+        const suffix = i === 0 ? "" : `_${i}`;
+        preamble.push(
+          factory.createVariableStatement(
+            undefined,
+            factory.createVariableDeclarationList(
+              [
+                factory.createVariableDeclaration(
+                  factory.createIdentifier(`_____sftimer${suffix}`),
+                  undefined,
+                  undefined,
+                  undefined
+                ),
+              ],
+              ts.NodeFlags.Let
+            )
+          ),
+          factory.createVariableStatement(
+            undefined,
+            factory.createVariableDeclarationList(
+              [
+                factory.createVariableDeclaration(
+                  factory.createIdentifier(`_____eftimer${suffix}`),
+                  undefined,
+                  undefined,
+                  undefined
+                ),
+              ],
+              ts.NodeFlags.Let
+            )
+          )
+        );
+      }
+
+      // Add exit handler
+      const exitHandler = factory.createArrowFunction(
+        undefined,
+        undefined,
+        [],
+        undefined,
+        factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
+        factory.createBlock(
+          [
+            factory.createExpressionStatement(
+              factory.createCallExpression(
+                factory.createPropertyAccessExpression(
+                  factory.createIdentifier("console"),
+                  factory.createIdentifier("log")
+                ),
+                undefined,
+                [factory.createStringLiteral("Performance Measurements:")]
+              )
+            ),
+            factory.createExpressionStatement(
+              factory.createCallExpression(
+                factory.createPropertyAccessExpression(
+                  factory.createIdentifier("console"),
+                  factory.createIdentifier("log")
+                ),
+                undefined,
+                [
+                  factory.createCallExpression(
+                    factory.createPropertyAccessExpression(
+                      factory.createIdentifier("JSON"),
+                      factory.createIdentifier("stringify")
+                    ),
+                    undefined,
+                    [
+                      factory.createIdentifier("_____ptimers"),
+                      factory.createNull(),
+                      factory.createNumericLiteral(2),
+                    ]
+                  ),
+                ]
+              )
+            ),
+          ],
+          true
+        )
+      );
+
+      preamble.push(
         factory.createExpressionStatement(
           factory.createCallExpression(
             factory.createPropertyAccessExpression(
@@ -201,72 +253,18 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
               factory.createIdentifier("on")
             ),
             undefined,
-            [
-              factory.createStringLiteral("exit"),
-              factory.createArrowFunction(
-                undefined,
-                undefined,
-                [],
-                undefined,
-                factory.createToken(ts.SyntaxKind.EqualsGreaterThanToken),
-                factory.createBlock([
-                  factory.createExpressionStatement(
-                    factory.createCallExpression(
-                      factory.createPropertyAccessExpression(
-                        factory.createIdentifier("console"),
-                        factory.createIdentifier("log")
-                      ),
-                      undefined,
-                      [factory.createStringLiteral("Performance Measurements:")]
-                    )
-                  ),
-                  factory.createExpressionStatement(
-                    factory.createCallExpression(
-                      factory.createPropertyAccessExpression(
-                        factory.createIdentifier("console"),
-                        factory.createIdentifier("log")
-                      ),
-                      undefined,
-                      [
-                        factory.createCallExpression(
-                          factory.createPropertyAccessExpression(
-                            factory.createIdentifier("JSON"),
-                            factory.createIdentifier("stringify")
-                          ),
-                          undefined,
-                          [
-                            factory.createIdentifier("_____ptimers"),
-                            factory.createNull(),
-                            factory.createNumericLiteral(2),
-                          ]
-                        ),
-                      ]
-                    )
-                  ),
-                ])
-              ),
-            ]
+            [factory.createStringLiteral("exit"), exitHandler]
           )
-        ),
-      ];
+        )
+      );
 
-      const statements = transformedSourceFile.statements.flatMap((stmt) => {
-        if (
-          ts.isImportDeclaration(stmt) ||
-          ts.isExportDeclaration(stmt) ||
-          (ts.isVariableStatement(stmt) &&
-            stmt.declarationList.declarations.some((d) =>
-              d.name.getText(sourceFile).startsWith("_____")
-            ))
-        ) {
-          return [stmt];
-        }
-        return createTimingWrapper(stmt as ts.Statement, sourceFile, 0);
-      });
+      const transformedSourceFile = ts.visitNode(sourceFile, (node) =>
+        visit(node, sourceFile)
+      ) as ts.SourceFile;
 
       return factory.updateSourceFile(transformedSourceFile, [
         ...preamble,
-        ...statements,
+        ...transformedSourceFile.statements,
       ]);
     };
   };
