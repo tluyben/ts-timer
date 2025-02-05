@@ -1,6 +1,8 @@
 import * as ts from "typescript";
 
-function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
+function createTransformer(
+  verbose: boolean
+): ts.TransformerFactory<ts.SourceFile> {
   return (context: ts.TransformationContext) => {
     const factory = ts.factory;
     let depth = 0;
@@ -212,14 +214,135 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
         undefined,
         factory.createBlock(
           [
-            factory.createExpressionStatement(
-              factory.createCallExpression(
-                factory.createPropertyAccessExpression(
-                  factory.createIdentifier("_____ptimers"),
-                  factory.createIdentifier("push")
-                ),
-                undefined,
-                [factory.createIdentifier("params")]
+            factory.createIfStatement(
+              verbose ? factory.createTrue() : factory.createFalse(),
+              factory.createBlock(
+                [
+                  factory.createExpressionStatement(
+                    factory.createCallExpression(
+                      factory.createPropertyAccessExpression(
+                        factory.createIdentifier("_____ptimers"),
+                        factory.createIdentifier("push")
+                      ),
+                      undefined,
+                      [factory.createIdentifier("params")]
+                    )
+                  ),
+                ],
+                true
+              ),
+              factory.createBlock(
+                [
+                  factory.createVariableStatement(
+                    undefined,
+                    factory.createVariableDeclarationList(
+                      [
+                        factory.createVariableDeclaration(
+                          factory.createIdentifier("i"),
+                          undefined,
+                          undefined,
+                          factory.createCallExpression(
+                            factory.createPropertyAccessExpression(
+                              factory.createIdentifier("_____ptimers"),
+                              factory.createIdentifier("findIndex")
+                            ),
+                            undefined,
+                            [
+                              factory.createArrowFunction(
+                                undefined,
+                                undefined,
+                                [
+                                  factory.createParameterDeclaration(
+                                    undefined,
+                                    undefined,
+                                    factory.createIdentifier("x"),
+                                    undefined,
+                                    factory.createKeywordTypeNode(
+                                      ts.SyntaxKind.AnyKeyword
+                                    )
+                                  ),
+                                ],
+                                undefined,
+                                factory.createToken(
+                                  ts.SyntaxKind.EqualsGreaterThanToken
+                                ),
+                                factory.createBinaryExpression(
+                                  factory.createPropertyAccessExpression(
+                                    factory.createIdentifier("x"),
+                                    factory.createIdentifier("line")
+                                  ),
+                                  factory.createToken(
+                                    ts.SyntaxKind.EqualsEqualsEqualsToken
+                                  ),
+                                  factory.createPropertyAccessExpression(
+                                    factory.createIdentifier("params"),
+                                    factory.createIdentifier("line")
+                                  )
+                                )
+                              ),
+                            ]
+                          )
+                        ),
+                      ],
+                      ts.NodeFlags.Const
+                    )
+                  ),
+                  factory.createIfStatement(
+                    factory.createBinaryExpression(
+                      factory.createIdentifier("i"),
+                      factory.createToken(ts.SyntaxKind.LessThanToken),
+                      factory.createNumericLiteral("0")
+                    ),
+                    factory.createExpressionStatement(
+                      factory.createCallExpression(
+                        factory.createPropertyAccessExpression(
+                          factory.createIdentifier("_____ptimers"),
+                          factory.createIdentifier("push")
+                        ),
+                        undefined,
+                        [factory.createIdentifier("params")]
+                      )
+                    ),
+                    factory.createBlock(
+                      [
+                        factory.createExpressionStatement(
+                          factory.createBinaryExpression(
+                            factory.createPropertyAccessExpression(
+                              factory.createElementAccessExpression(
+                                factory.createIdentifier("_____ptimers"),
+                                factory.createIdentifier("i")
+                              ),
+                              factory.createIdentifier("diff")
+                            ),
+                            factory.createToken(ts.SyntaxKind.PlusEqualsToken),
+                            factory.createPropertyAccessExpression(
+                              factory.createIdentifier("params"),
+                              factory.createIdentifier("diff")
+                            )
+                          )
+                        ),
+                        factory.createExpressionStatement(
+                          factory.createBinaryExpression(
+                            factory.createPropertyAccessExpression(
+                              factory.createElementAccessExpression(
+                                factory.createIdentifier("_____ptimers"),
+                                factory.createIdentifier("i")
+                              ),
+                              factory.createIdentifier("end")
+                            ),
+                            factory.createToken(ts.SyntaxKind.EqualsToken),
+                            factory.createPropertyAccessExpression(
+                              factory.createIdentifier("params"),
+                              factory.createIdentifier("end")
+                            )
+                          )
+                        ),
+                      ],
+                      true
+                    )
+                  ),
+                ],
+                true
               )
             ),
           ],
@@ -449,7 +572,10 @@ function createTransformer(): ts.TransformerFactory<ts.SourceFile> {
   };
 }
 
-export function addTimers(sourceCode: string): string {
+export function addTimers(
+  sourceCode: string,
+  verbose: boolean = false
+): string {
   const sourceFile = ts.createSourceFile(
     "source.ts",
     sourceCode,
@@ -457,7 +583,7 @@ export function addTimers(sourceCode: string): string {
     true
   );
 
-  const result = ts.transform(sourceFile, [createTransformer()]);
+  const result = ts.transform(sourceFile, [createTransformer(verbose)]);
   const printer = ts.createPrinter({
     newLine: ts.NewLineKind.LineFeed,
     removeComments: false,
