@@ -5,8 +5,6 @@ let _____sftimer_1: any;
 let _____eftimer_1: any;
 let _____sftimer_2: any;
 let _____eftimer_2: any;
-let _____sftimer_3: any;
-let _____eftimer_3: any;
 process.on("exit", () => {
     console.log("Performance Measurements:");
     console.log(JSON.stringify(_____ptimers, null, 2));
