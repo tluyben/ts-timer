@@ -5,17 +5,10 @@ export function createTimerPushBlock(
   timerSuffix: string,
   line: number,
   code: string,
-  children: ts.Statement
+  children: ts.Statement | undefined,
+  start = true
 ): ts.Statement[] {
-  return [
-    factory.createExpressionStatement(
-      factory.createBinaryExpression(
-        factory.createIdentifier(`_____sftimer${timerSuffix}`),
-        factory.createToken(ts.SyntaxKind.EqualsToken),
-        factory.createNewExpression(factory.createIdentifier("Date"), [], [])
-      )
-    ),
-    children,
+  let block: ts.Statement[] = [
     factory.createExpressionStatement(
       factory.createBinaryExpression(
         factory.createIdentifier(`_____eftimer${timerSuffix}`),
@@ -70,4 +63,19 @@ export function createTimerPushBlock(
       )
     ),
   ];
+  if (children) {
+    block.unshift(children);
+  }
+  if (start) {
+    block.unshift(
+      factory.createExpressionStatement(
+        factory.createBinaryExpression(
+          factory.createIdentifier(`_____sftimer${timerSuffix}`),
+          factory.createToken(ts.SyntaxKind.EqualsToken),
+          factory.createNewExpression(factory.createIdentifier("Date"), [], [])
+        )
+      )
+    );
+  }
+  return block;
 }

@@ -1,5 +1,5 @@
-import { addTimers } from './addtimers';
-import { addAny } from './addany';
+import { addTimers } from './add-timers';
+import { addAny } from './add-any';
 
 export { addTimers, addAny };
 

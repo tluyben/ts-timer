@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { createTimerPushBlock } from "./timer-push";
+import { handleReturnStatement } from "./handle-return";
 
 export function createVisitor(context: ts.TransformationContext) {
   const factory = ts.factory;
@@ -21,6 +22,20 @@ export function createVisitor(context: ts.TransformationContext) {
           return [stmt];
         }
 
+        if (ts.isReturnStatement(stmt)) {
+          return handleReturnStatement(
+            stmt,
+            factory,
+            depth - 1,
+            sf,
+            context
+          )[0];
+          return factory.createBlock(
+            handleReturnStatement(stmt, factory, depth, sf, context),
+            true
+          );
+        }
+
         const timerSuffix = depth > 0 ? `_${depth}` : "";
         return [
           ...createTimerPushBlock(
@@ -33,6 +48,7 @@ export function createVisitor(context: ts.TransformationContext) {
         ];
       });
       depth--;
+
       return factory.createBlock(statements, true);
     }
 
@@ -45,6 +61,14 @@ export function createVisitor(context: ts.TransformationContext) {
       );
       depth--;
       return result;
+    }
+
+    if (ts.isReturnStatement(node)) {
+      return handleReturnStatement(node, factory, depth, sf, context)[0];
+      return factory.createBlock(
+        handleReturnStatement(node, factory, depth, sf, context),
+        true
+      );
     }
 
     // Handle function declarations
