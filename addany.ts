@@ -2,7 +2,9 @@ import { Project } from "ts-morph";
 
 export function addAny(sourceCode: string) {
   const project = new Project();
-  const sourceFile = project.createSourceFile("temp.ts", sourceCode, {overwrite: true});
+  const sourceFile = project.createSourceFile("temp.ts", sourceCode, {
+    overwrite: true,
+  });
 
   // Add :any to function parameters
   sourceFile.getFunctions().forEach((func) => {

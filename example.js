@@ -1,4 +1,6 @@
 function fibonacci(n) {
+  if (n <= 1) return n;
+
   let n1 = 0,
     n2 = 1,
     nextTerm;
