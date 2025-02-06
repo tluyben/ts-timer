@@ -13,7 +13,14 @@ export function createTimerPushBlock(
       factory.createBinaryExpression(
         factory.createIdentifier(`_____eftimer${timerSuffix}`),
         factory.createToken(ts.SyntaxKind.EqualsToken),
-        factory.createNewExpression(factory.createIdentifier("Date"), [], [])
+        factory.createCallExpression(
+          factory.createPropertyAccessExpression(
+            factory.createIdentifier("performance"),
+            factory.createIdentifier("now")
+          ),
+          [],
+          []
+        )
       )
     ),
     factory.createExpressionStatement(
@@ -72,7 +79,14 @@ export function createTimerPushBlock(
         factory.createBinaryExpression(
           factory.createIdentifier(`_____sftimer${timerSuffix}`),
           factory.createToken(ts.SyntaxKind.EqualsToken),
-          factory.createNewExpression(factory.createIdentifier("Date"), [], [])
+          factory.createCallExpression(
+            factory.createPropertyAccessExpression(
+              factory.createIdentifier("performance"),
+              factory.createIdentifier("now")
+            ),
+            [],
+            []
+          )
         )
       )
     );

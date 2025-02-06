@@ -15,4 +15,4 @@ function fibonacci(n) {
   }
 }
 
-fibonacci(10000);
+fibonacci(100);
