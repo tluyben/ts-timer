@@ -26,10 +26,10 @@ export function createVisitor(context: ts.TransformationContext) {
           ...createTimerPushBlock(
             factory,
             timerSuffix,
-            sf.getLineAndCharacterOfPosition(stmt.pos).line + 1,
-            stmt.getText(sf)
+            sf.getLineAndCharacterOfPosition(stmt.getStart()).line + 1,
+            stmt.getText(sf),
+            ts.visitEachChild(stmt, (child) => visit(child, sf), context)
           ),
-          ts.visitEachChild(stmt, (child) => visit(child, sf), context),
         ];
       });
       depth--;
@@ -101,10 +101,10 @@ export function transformSourceFileStatements(
       ...createTimerPushBlock(
         factory,
         timerSuffix,
-        sourceFile.getLineAndCharacterOfPosition(stmt.pos).line + 1,
-        stmt.getText(sourceFile)
+        sourceFile.getLineAndCharacterOfPosition(stmt.getStart()).line + 1,
+        stmt.getText(sourceFile),
+        visitedStmt
       ),
-      visitedStmt,
     ];
   });
 }
@@ -113,11 +113,7 @@ export function calculateMaxDepth(node: ts.Node): number {
   let max = 0;
   let current = 0;
   const visit = (node: ts.Node) => {
-    if (
-      ts.isBlock(node) ||
-      ts.isForStatement(node) ||
-      ts.isIfStatement(node)
-    ) {
+    if (ts.isBlock(node) || ts.isForStatement(node) || ts.isIfStatement(node)) {
       current++;
       max = Math.max(max, current);
       ts.forEachChild(node, visit);

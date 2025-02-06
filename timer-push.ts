@@ -4,29 +4,23 @@ export function createTimerPushBlock(
   factory: ts.NodeFactory,
   timerSuffix: string,
   line: number,
-  code: string
+  code: string,
+  children: ts.Statement
 ): ts.Statement[] {
   return [
     factory.createExpressionStatement(
       factory.createBinaryExpression(
         factory.createIdentifier(`_____sftimer${timerSuffix}`),
         factory.createToken(ts.SyntaxKind.EqualsToken),
-        factory.createNewExpression(
-          factory.createIdentifier("Date"),
-          [],
-          []
-        )
+        factory.createNewExpression(factory.createIdentifier("Date"), [], [])
       )
     ),
+    children,
     factory.createExpressionStatement(
       factory.createBinaryExpression(
         factory.createIdentifier(`_____eftimer${timerSuffix}`),
         factory.createToken(ts.SyntaxKind.EqualsToken),
-        factory.createNewExpression(
-          factory.createIdentifier("Date"),
-          [],
-          []
-        )
+        factory.createNewExpression(factory.createIdentifier("Date"), [], [])
       )
     ),
     factory.createExpressionStatement(
